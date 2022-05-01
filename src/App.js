@@ -13,12 +13,39 @@ const App = () => {
   const [messageValue, setMessageValue] = useState("");
   /* すべてのwavesを保存する状態変数を定義 */
   const [allWaves, setAllWaves] = useState([]);
+  /* コントラクトの残高を保存する状態変数を定義 */
+  const [thisContractBalance, setThisContractBalance] = useState("");
   console.log("currentAccount: ", currentAccount);
   /* デプロイされたコントラクトのアドレスを保持する変数を作成 */
-  const contractAddress = "0x65822d11bd8f0A4DA3fF305C760c6d43DADC43f1";
+  const contractAddress = "0x8149aa69E435eeA85aE7cB09a278Acefc1B8E072";
   /* コントラクトからすべてのwavesを取得するメソッドを作成 */
   /* ABIの内容を参照する変数を作成 */
   const contractABI = abi.abi;
+
+  const contractBalanceReload = async () => {
+    const { ethereum } = window;
+    try {
+      if (ethereum) {
+        const provider = new ethers.providers.Web3Provider(ethereum);
+        const signer = provider.getSigner();
+        const wavePortalContract = new ethers.Contract(
+          contractAddress,
+          contractABI,
+          signer
+        );
+        /* コントラクトの残高を取得*/
+        setThisContractBalance(
+          ethers.utils.formatEther(
+            await wavePortalContract.getContractBalance()
+          )
+        );
+      } else {
+        console.log("Ethereum object doesn't exist!");
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
 
   const getAllWaves = async () => {
     const { ethereum } = window;
@@ -40,6 +67,7 @@ const App = () => {
             address: wave.waver,
             timestamp: new Date(wave.timestamp * 1000),
             message: wave.message,
+            balance: ethers.utils.formatEther(wave.balance),
           };
         });
         /* React Stateにデータを格納する */
@@ -58,14 +86,15 @@ const App = () => {
   useEffect(() => {
     let wavePortalContract;
 
-    const onNewWave = (from, timestamp, message) => {
-      console.log("NewWave", from, timestamp, message);
+    const onNewWave = (from, timestamp, message, balance) => {
+      console.log("NewWave", from, timestamp, message, balance);
       setAllWaves((prevState) => [
         ...prevState,
         {
           address: from,
           timestamp: new Date(timestamp * 1000),
           message: message,
+          balance: ethers.utils.formatEther(balance),
         },
       ]);
     };
@@ -190,7 +219,9 @@ const App = () => {
   useEffect(() => {
     checkIfWalletIsConnected();
   }, []);
-
+  useEffect(() => {
+    contractBalanceReload();
+  }, [allWaves]);
   return (
     <div className="mainContainer">
       <div className="dataContainer">
@@ -211,6 +242,10 @@ const App = () => {
           </span>
         </div>
         <br />
+        {/* コントラクト残高 */}
+        {thisContractBalance && (
+          <p>Contract Balance : {thisContractBalance} eth</p>
+        )}
         {/* ウォレットコネクトのボタンを実装 */}
         {!currentAccount && (
           <button className="waveButton" onClick={connectWallet}>
@@ -218,7 +253,9 @@ const App = () => {
           </button>
         )}
         {currentAccount && (
-          <button className="waveButton">Wallet Connected</button>
+          <button className="waveButton" disabled={currentAccount}>
+            Wallet Connected
+          </button>
         )}
         {/* waveボタンにwave関数を連動 */}
         {currentAccount && (
@@ -255,6 +292,7 @@ const App = () => {
                   <div>Address: {wave.address}</div>
                   <div>Time: {wave.timestamp.toString()}</div>
                   <div>Message: {wave.message}</div>
+                  <div>balance: {wave.balance} eth</div>
                 </div>
               );
             })}
